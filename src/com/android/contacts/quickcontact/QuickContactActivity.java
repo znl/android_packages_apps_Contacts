@@ -73,6 +73,7 @@ import android.provider.ContactsContract.DataUsageFeedback;
 import android.provider.ContactsContract.Intents;
 import android.provider.ContactsContract.QuickContact;
 import android.provider.ContactsContract.RawContacts;
+import android.provider.Telephony;
 import android.support.v7.graphics.Palette;
 import android.telecom.PhoneAccount;
 import android.telecom.TelecomManager;
@@ -140,6 +141,7 @@ import com.android.contacts.common.model.dataitem.WebsiteDataItem;
 import com.android.contacts.common.util.ImplicitIntentsUtil;
 import com.android.contacts.common.MoreContactUtils;
 import com.android.contacts.common.SimContactsConstants;
+import com.android.contacts.common.util.BitmapUtil;
 import com.android.contacts.common.util.DateUtils;
 import com.android.contacts.common.util.MaterialColorMapUtils;
 import com.android.contacts.common.util.MaterialColorMapUtils.MaterialPalette;
@@ -170,6 +172,8 @@ import com.android.contactsbind.HelpUtils;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.ImmutableList;
+import com.squareup.picasso.Picasso;
+import com.squareup.picasso.Target;
 import java.lang.SecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -274,6 +278,8 @@ public class QuickContactActivity extends ContactsActivity {
     private int mColorFilterColor;
 
     private final ImageViewDrawableSetter mPhotoSetter = new ImageViewDrawableSetter();
+
+    private Target mContactBitmapTarget;
 
     /**
      * {@link #LEADING_MIMETYPES} is used to sort MIME-types.
@@ -946,7 +952,6 @@ public class QuickContactActivity extends ContactsActivity {
 
         getWindow().setStatusBarColor(Color.TRANSPARENT);
 
-        processIntent(getIntent());
 
         // Show QuickContact in front of soft input
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
@@ -1061,7 +1066,7 @@ public class QuickContactActivity extends ContactsActivity {
                         }
                     });
         }
-
+        processIntent(getIntent());
         Trace.endSection();
     }
 
@@ -1124,13 +1129,25 @@ public class QuickContactActivity extends ContactsActivity {
         mExtraPrioritizedMimeType = getIntent().getStringExtra(QuickContact.EXTRA_PRIORITIZED_MIMETYPE);
         final Uri oldLookupUri = mLookupUri;
 
-        if (lookupUri == null) {
+        mLookupUri = lookupUri;
+        mExcludeMimes = intent.getStringArrayExtra(QuickContact.EXTRA_EXCLUDE_MIMES);
+
+        Contact contact = null;
+        if (mLookupUri == null) {
+            // See if a URI has been attached as an extra
+            mLookupUri = intent.getParcelableExtra(Contact.CONTACT_URI_EXTRA);
+            contact = ContactLoader.parseEncodedContactEntity(mLookupUri,
+                    ContactLoader.EncodedContactEntitySchemaVersion.ENHANCED_CALLER_META_DATA);
+        }
+
+        if (mLookupUri == null) {
             finish();
             return;
         }
-        mLookupUri = lookupUri;
-        mExcludeMimes = intent.getStringArrayExtra(QuickContact.EXTRA_EXCLUDE_MIMES);
-        if (oldLookupUri == null) {
+
+        if (contact != null) {
+            bindContactData(contact);
+        } else if (oldLookupUri == null) {
             mContactLoader = (ContactLoader) getLoaderManager().initLoader(
                     LOADER_CONTACT_ID, null, mLoaderContactCallbacks);
         } else if (oldLookupUri != mLookupUri) {
@@ -1175,6 +1192,21 @@ public class QuickContactActivity extends ContactsActivity {
         }
     }
 
+    private void setAttributionText(String value) {
+        if (!TextUtils.isEmpty(value)) {
+            if (mScroller != null) {
+                mScroller.setAttributionText(getString(R.string.powered_by_provider, value));
+            }
+        }
+    }
+
+    private void setSpamCountText(int value) {
+        if (mScroller != null && value > 0) {
+            mScroller.setSpamCountText(
+                    getResources().getQuantityString(R.plurals.spam_count_text, value, value));
+        }
+    }
+
     /**
      * Check if the given MIME-type appears in the list of excluded MIME-types
      * that the most-recent caller requested.
@@ -1201,7 +1233,28 @@ public class QuickContactActivity extends ContactsActivity {
         Trace.beginSection("Set display photo & name");
 
         mPhotoView.setIsBusiness(mContactData.isDisplayNameFromOrganization());
-        mPhotoSetter.setupContactPhoto(data, mPhotoView);
+        if (mContactData.getPhotoBinaryData() == null && mContactData.getPhotoUri() != null) {
+            mContactBitmapTarget = new Target() {
+                @Override
+                public void onPrepareLoad(Drawable d){}
+                @Override
+                public void onBitmapLoaded(Bitmap result, Picasso.LoadedFrom from) {
+                    if (result != null) {
+                        mContactData.setPhotoBinaryData(BitmapUtil.bitmapToByteArray(result));
+                        mPhotoSetter.setupContactPhoto(data, mPhotoView);
+                    }
+                    mContactBitmapTarget = null;
+                }
+                @Override
+                public void onBitmapFailed(Drawable drawable) {
+                    mPhotoSetter.setupContactPhoto(data, mPhotoView);
+                    mContactBitmapTarget = null;
+                }
+            };
+            Picasso.with(this).load(mContactData.getPhotoUri()).into(mContactBitmapTarget);
+        } else {
+            mPhotoSetter.setupContactPhoto(data, mPhotoView);
+        }
         extractAndApplyTintFromPhotoViewAsynchronously();
         String phoneticName = ContactDisplayUtils.getPhoneticName(this, data);
         String displayName = ContactDisplayUtils.getDisplayName(this, data).toString();
@@ -1212,6 +1265,16 @@ public class QuickContactActivity extends ContactsActivity {
             setHeaderNameText(displayName);
         } else {
             setHeaderNameText(displayName);
+        }
+
+        setAttributionText(data.getProviderName());
+        final int spamCount = data.getSpamCount();
+        if (spamCount > 0) {
+            mHasComputedThemeColor = true;
+            setThemeColor(mMaterialColorMapUtils
+                    .calculatePrimaryAndSecondaryColor(getResources()
+                            .getColor(R.color.letter_tile_red_color)));
+            setSpamCountText(spamCount);
         }
 
         Trace.endSection();
@@ -1320,7 +1383,7 @@ public class QuickContactActivity extends ContactsActivity {
             // the name mimetype.
             final List<Entry> aboutEntries = dataItemsToEntries(mimeTypeItems,
                     /* aboutCardTitleOut = */ null);
-            if (aboutEntries.size() > 0) {
+            if (aboutEntries != null && aboutEntries.size() > 0) {
                 aboutCardEntries.add(aboutEntries);
             }
         }
@@ -2696,7 +2759,8 @@ public class QuickContactActivity extends ContactsActivity {
 
     private boolean isShortcutCreatable() {
         if (mContactData == null || mContactData.isUserProfile() ||
-                mContactData.isDirectoryEntry()) {
+                mContactData.isDirectoryEntry() ||
+                !TextUtils.isEmpty(mContactData.getProviderName())) {
             return false;
         }
         final Intent createShortcutIntent = new Intent();
@@ -2778,9 +2842,13 @@ public class QuickContactActivity extends ContactsActivity {
                 + ":" + organization + "\r\n";
         sipAddress = (sipAddress == null) ? "" : getString(R.string.label_sip_address) + ":"
                 + sipAddress + "\r\n";
-        Intent intent = new Intent(Intent.ACTION_VIEW);
+        String defaultSmsPackageName = Telephony.Sms.getDefaultSmsPackage(this);
+        Intent intent = new Intent(Intent.ACTION_SEND);
         intent.putExtra("sms_body", name + phone + email + postal + organization + sipAddress);
-        intent.setType("vnd.android-dir/mms-sms");
+        intent.setType("text/plain");
+        if (defaultSmsPackageName != null) {
+            intent.setPackage(defaultSmsPackageName);
+        }
         startActivity(intent);
     }
 
@@ -3112,6 +3180,7 @@ public class QuickContactActivity extends ContactsActivity {
     private Handler mHandler = null;
 
     private void copyToCard(final int sub) {
+        final Contact contactData = mContactData;
         final int MSG_COPY_DONE = 0;
         final int MSG_COPY_FAILURE = 1;
         final int MSG_CARD_NO_SPACE = 2;
@@ -3197,12 +3266,12 @@ public class QuickContactActivity extends ContactsActivity {
                     int emptyNumTotal = totalEmptyAdn + totalEmptyAnr;
 
                     // Get name string
-                    String strName = mContactData.getDisplayName();
+                    String strName = contactData.getDisplayName();
 
                     ArrayList<String> arrayNumber = new ArrayList<String>();
                     ArrayList<String> arrayEmail = new ArrayList<String>();
 
-                    for (RawContact rawContact : mContactData.getRawContacts()) {
+                    for (RawContact rawContact : contactData.getRawContacts()) {
                         for (DataItem dataItem : rawContact.getDataItems()) {
                             if (dataItem.getMimeType() == null) {
                                 continue;

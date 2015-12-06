@@ -213,7 +213,7 @@
 
         <activity
             android:name=".activities.MemoryStatusActivity"
-            android:label="@string/memory_status_title"
+            android:label="@string/menu_memory_status"
             android:theme="@style/ContactListFilterTheme" />
 
         <!-- Used to select display and sync groups -->
@@ -273,6 +273,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="vnd.android.cursor.item/contact" />
                 <data android:mimeType="vnd.android.cursor.item/person" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="com.android.contacts.action.QUICK_CONTACT" />
+                <action android:name="android.provider.action.QUICK_CONTACT" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
             <intent-filter>
