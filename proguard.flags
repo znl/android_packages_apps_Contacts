@@ -22,3 +22,7 @@
 }
 
 -verbose
+
+-dontwarn org.apache.http.**
+-dontwarn android.net.http.**
+-dontwarn com.android.volley.toolbox.**
