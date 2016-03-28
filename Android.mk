@@ -31,6 +31,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     libphonenumber \
     libSudaPinYin \
     libSudaLocation \
+    libSudaSdk \
     contacts-picaso
 
 LOCAL_PACKAGE_NAME := Contacts
