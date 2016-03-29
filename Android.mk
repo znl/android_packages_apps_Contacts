@@ -34,7 +34,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     libSudaSdk \
     contacts-picaso \
     libOkHttp \
-    libOKIO \
+    libOKIO
 
 LOCAL_PACKAGE_NAME := Contacts
 LOCAL_CERTIFICATE := shared
