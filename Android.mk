@@ -32,7 +32,9 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     libSudaPinYin \
     libSudaLocation \
     libSudaSdk \
-    contacts-picaso
+    contacts-picaso \
+    libOkHttp \
+    libOKIO \
 
 LOCAL_PACKAGE_NAME := Contacts
 LOCAL_CERTIFICATE := shared
