@@ -957,7 +957,7 @@ public class QuickContactActivity extends ContactsActivity implements
         }
         mIsUpdating = new AtomicBoolean(false);
         processIntent(getIntent());
-        mBlockContactHelper = new BlockContactHelper(this, new LookupProviderImpl(this));
+        mBlockContactHelper = new BlockContactHelper(this);
         if (mContactData != null) {
             mBlockContactHelper.setContactInfo(mContactData);
             mBlockContactHelper.gatherDataInBackground();
@@ -1294,10 +1294,17 @@ public class QuickContactActivity extends ContactsActivity implements
     @Override
     protected void onResume() {
         super.onResume();
-        if (ContactsDataSubscription.get(this)
-                .subscribe(CALL_METHOD_SUBSCRIBER_ID, pluginsUpdatedReceiver)) {
+        ContactsDataSubscription dataSubscription = ContactsDataSubscription.get(this);
+        if (dataSubscription.subscribe(CALL_METHOD_SUBSCRIBER_ID, pluginsUpdatedReceiver)) {
             if (DEBUG) Log.d(TAG, "ContactsDataSubscription infoReady");
-            ContactsDataSubscription.get(this).refreshDynamicItems();
+            if (CallMethodFilters.getAllEnabledCallMethods(dataSubscription).size() > 0) {
+                // only refresh if there are ENABLED plugins
+                dataSubscription.refreshDynamicItems();
+            } else {
+                // double check if UI needs update in case plugin status changes between
+                // ENABLED and DISABLED or ENABLED and HIDDEN or DISABLED and HIDDEN
+                updatePlugins(null);
+            }
         } else {
             if (DEBUG) Log.d(TAG, "ContactsDataSubscription info NOT Ready");
         }
@@ -1505,13 +1512,11 @@ public class QuickContactActivity extends ContactsActivity implements
         final ResolveCache cache = ResolveCache.getInstance(this);
         Set<String> pluginMimeExcluded;
         Set<String> pluginMimeIncluded;
+        ContactsDataSubscription subscription = ContactsDataSubscription.get(this);
         if (ContactsDataSubscription.infoReady()) {
-            mCallMethodMap = CallMethodFilters.getAllEnabledAndHiddenCallMethods(
-                    ContactsDataSubscription.get(this));
-            pluginMimeExcluded = MimeTypeUtils.getAllEnabledVideoImMimeSet(
-                    ContactsDataSubscription.get(this));
-            pluginMimeIncluded = MimeTypeUtils.getAllEnabledVoiceMimeSet(
-                    ContactsDataSubscription.get(this));
+            mCallMethodMap = CallMethodFilters.getAllEnabledAndHiddenCallMethods(subscription);
+            pluginMimeExcluded = MimeTypeUtils.getAllEnabledVideoImMimeSet(subscription);
+            pluginMimeIncluded = MimeTypeUtils.getAllEnabledVoiceMimeSet(subscription);
 
             if (DEBUG) {
                 Log.d(TAG, "plugins size:" + mCallMethodMap.size());
@@ -3795,7 +3800,8 @@ public class QuickContactActivity extends ContactsActivity implements
             if (newCmMap.containsKey(cn)) {
                 // Check if update needed
                 CallMethodInfo newCmi = newCmMap.remove(cn);
-                if (newCmi.mIsAuthenticated != cmi.mIsAuthenticated) {
+                if (newCmi.mStatus != cmi.mStatus ||
+                        newCmi.mIsAuthenticated != cmi.mIsAuthenticated) {
                     updateNeeded = true;
                 }
             } else {
