@@ -1513,7 +1513,7 @@ public class QuickContactActivity extends ContactsActivity implements
         Set<String> pluginMimeExcluded;
         Set<String> pluginMimeIncluded;
         ContactsDataSubscription subscription = ContactsDataSubscription.get(this);
-        if (ContactsDataSubscription.infoReady()) {
+        if (subscription.infoReady()) {
             mCallMethodMap = CallMethodFilters.getAllEnabledAndHiddenCallMethods(subscription);
             pluginMimeExcluded = MimeTypeUtils.getAllEnabledVideoImMimeSet(subscription);
             pluginMimeIncluded = MimeTypeUtils.getAllEnabledVoiceMimeSet(subscription);
@@ -1618,8 +1618,8 @@ public class QuickContactActivity extends ContactsActivity implements
                 }
             }
         }
-        if (!mContactData.isUserProfile() && ContactsDataSubscription.infoReady() && mCallMethodMap
-                .size() > 0) {
+        if (!mContactData.isUserProfile() && subscription.infoReady()
+                && !mCallMethodMap.isEmpty()) {
             addAllInCallPluginOtherEntries(contactCardEntries, pluginAccountsMap);
         }
 
