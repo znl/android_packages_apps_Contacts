@@ -205,6 +205,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.sudamod.sdk.phonelocation.PhoneUtil;
+
 /**
  * Mostly translucent {@link Activity} that shows QuickContact dialog. It loads
  * data asynchronously, and then shows a popup with details centered around
@@ -1820,6 +1822,7 @@ public class QuickContactActivity extends ContactsActivity implements
                 entryContextMenuInfo = new EntryContextMenuInfo(header,
                         res.getString(R.string.phoneLabelsGroup), dataItem.getMimeType(),
                         dataItem.getId(), dataItem.isSuperPrimary(), header);
+                String location = PhoneUtil.getPhoneUtil(context).getLocalNumberInfo(phone.getNumber(), false);
                 if (phone.hasKindTypeColumn(kind)) {
                     final int kindTypeColumn = phone.getKindTypeColumn(kind);
                     final String label = phone.getLabel();
@@ -1828,9 +1831,19 @@ public class QuickContactActivity extends ContactsActivity implements
                         text = "";
                     } else {
                         text = Phone.getTypeLabel(res, kindTypeColumn, label).toString();
+                        if (!TextUtils.isEmpty(location)) {
+                            text = text + " " + location;
+                        }
                         phoneLabel= text;
                         primaryContentDescription.append(text).append(" ");
                     }
+                } else {
+                    text = "";
+                    if (!TextUtils.isEmpty(location)) {
+                        text = text + " " + location;
+                    }
+                    phoneLabel= text;
+                    primaryContentDescription.append(text).append(" ");
                 }
                 primaryContentDescription.append(header);
                 icon = res.getDrawable(R.drawable.ic_phone_24dp);

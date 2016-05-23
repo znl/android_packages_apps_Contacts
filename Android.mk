@@ -37,6 +37,11 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     android-support-v7-palette \
     android-support-v4 \
     libphonenumber \
+    libSudaPinYin \
+    libSudaLocation \
+    libSudaSdk \
+    libOkHttp \
+    libOKIO \
     org.cyanogenmod.platform.sdk \
     contacts-picaso
 
