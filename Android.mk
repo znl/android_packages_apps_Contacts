@@ -41,8 +41,6 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     libSudaLocation \
     libSudaSdk \
     contacts-picaso \
-    libOkHttp \
-    libOKIO \
     org.cyanogenmod.platform.sdk
 
 LOCAL_PACKAGE_NAME := Contacts
